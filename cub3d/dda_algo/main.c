@@ -1,12 +1,12 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   dda.c                                              :+:      :+:    :+:   */
+/*   main.c                                             :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: psanger <psanger@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/06/05 19:24:38 by psanger           #+#    #+#             */
-/*   Updated: 2024/06/10 21:46:07 by psanger          ###   ########.fr       */
+/*   Updated: 2024/06/12 18:03:14 by psanger          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,16 +15,19 @@
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
+#include "../MLX42/include/MLX42/MLX42.h"
+
 # define BLUE "\033[0;34m"
 # define RESET "\033[0m"
 # define RED "\033[0;31m"
 # define pixel_size 16
 # define PI 3.141592
 
+
 typedef struct s_dda
 {
-	char		**map;
-	int			angle;
+	char			**map;
+	float			angle;
 
 	float			start_x;
 	float			start_y;
@@ -43,6 +46,16 @@ typedef struct s_dda
 	char			wall_face;
 
 }				t_dda;
+
+typedef struct s_mlx
+{
+	mlx_t*			mlx;
+	mlx_image_t*	img;
+
+	int			width;
+	int			height;
+}				t_mlx;
+
 
 float	to_rad(int angle)
 {
@@ -146,6 +159,7 @@ int	get_new_pos(t_dda *dda, char **map)
 	hyplen_x = abs_float(dda->delta_x) / abs_float(cos(to_rad(dda->angle)));
 	hyplen_y = abs_float(dda->delta_y) / abs_float(sin(to_rad(dda->angle)));
 
+	// printf("test3\n");
 
 
 
@@ -155,7 +169,7 @@ int	get_new_pos(t_dda *dda, char **map)
 
 	if (hyplen_x < hyplen_y)
 	{
-		printf("%sSTEP in X%s\n", RED, RESET);
+		// printf("%sSTEP in X%s\n", RED, RESET);
 		dda->end_x = dda->end_x + dda->delta_x;
 		dda->end_y = dda->end_y + (hyplen_x * abs_float(sin(to_rad(dda->angle))) * dda->step_direction_y);
 		if (is_wall_x(map, dda) == 1)
@@ -163,7 +177,7 @@ int	get_new_pos(t_dda *dda, char **map)
 	}
 	else
 	{
-		printf("%sSTEP in Y%s\n", RED, RESET);
+		// printf("%sSTEP in Y%s\n", RED, RESET);
 		dda->end_x = dda->end_x + (hyplen_y * abs_float(cos(to_rad(dda->angle))) * dda->step_direction_x);
 		dda->end_y = dda->end_y + dda->delta_y;
 		if (is_wall_y(map, dda) == 1)
@@ -178,11 +192,11 @@ int	get_new_pos(t_dda *dda, char **map)
 
 void	dda_algo(t_dda *dda, char **map)
 {
-	while (dda->angle < 360)
-		dda->angle = dda->angle + 360;
-
 	int	is_wall = 0;
 
+	get_dir(dda->angle, &dda->step_direction_x, &dda->step_direction_y);
+	dda->end_x = dda->start_x;
+	dda->end_y = dda->start_y;
 	while (1)
 	{
 		is_wall = get_new_pos(dda, map);
@@ -193,12 +207,14 @@ void	dda_algo(t_dda *dda, char **map)
 	dda->delta_x = dda->end_x - dda->start_x;
 	dda->delta_y = dda->end_y - dda->start_y;
 	dda->len = pow(pow(dda->delta_x, 2) + pow(dda->delta_y, 2), 0.5);
-	printf("\n\n\n-----------------\n\n");
-	printf("END POS X :\t\t|%f|\n", dda->end_x);
-	printf("END POS Y :\t\t|%f|\n", dda->end_y);
-	printf("LEN :\t\t\t|%f|\n", dda->len);
-	printf("WALL FACE :\t\t|%c|", dda->wall_face);
-	printf("\n---------\n");
+	// printf("\n\n\n-----------------\n\n");
+	// printf("END POS X :\t\t|%f|\n", dda->end_x);
+	// printf("END POS Y :\t\t|%f|\n", dda->end_y);
+
+	// printf("LEN :\t|%f|,angle |%f| \n", dda->len, dda->angle);
+
+	// printf("WALL FACE :\t\t|%c|", dda->wall_face);
+	// printf("\n---------\n");
 }
 
 
@@ -208,6 +224,8 @@ void	init_dda(t_dda *dda, char **argv, float x_start, float y_start)
 		dda->angle = 0;
 	else
 		dda->angle = atoi(argv[1]);
+	while (dda->angle < 360)
+		dda->angle = dda->angle + 360;
 	dda->delta_x = 0;
 	dda->delta_y = 0;
 	dda->len = 0;
@@ -218,12 +236,61 @@ void	init_dda(t_dda *dda, char **argv, float x_start, float y_start)
 	get_dir(dda->angle, &dda->step_direction_x, &dda->step_direction_y);
 }
 
+
+int32_t ft_pixel(int32_t r, int32_t g, int32_t b, int32_t a)
+{
+	return (r << 24 | g << 16 | b << 8 | a);
+}
+
+void cast(t_dda *dda, t_mlx *mlx, int pixel) {
+
+	// getting rid of fish eye:
+	float real_len = dda->len * cos(to_rad(dda->angle));
+
+	float height = (400 / real_len) / 2;
+
+	printf("%f %f %f\n", height, dda->len, dda->angle);
+	int mid = mlx->height / 2;
+	// bottom
+	for (int i = mid; i < mid + height; i++)
+		mlx_put_pixel(mlx->img, pixel, i, ft_pixel(123, 10, 255, 255));
+	// top
+	for (int i = mid - height; i < mid; i++)
+		mlx_put_pixel(mlx->img, pixel, i, ft_pixel(123, 10, 255, 255));
+}
+
+void init_mlx(t_mlx *mlx) {
+	mlx->width = 1024;
+	mlx->height = 512;
+
+	mlx->mlx = mlx_init(mlx->width, mlx->height, "Test", false);
+	mlx->img = mlx_new_image(mlx->mlx, mlx->width, mlx->height);
+	mlx_image_to_window(mlx->mlx, mlx->img, 0, 0);
+}
+
+void	loop_hook()
+{
+	float angle = dda.angle;
+	dda.angle -= 60;
+	double increment = (120.0f / 1024.0f);
+	int pixel = 0;
+
+	while (dda.angle < angle + 60)
+	{
+		pixel++;
+		dda.angle += increment;
+		// printf("%f\n", dda.angle);
+		dda_algo(&dda, map);
+		cast(&dda, &mlx, pixel);
+	}
+}
+
 int main(int argc, char **argv)
 {
 	float	start[3] = {2.5, 2.5, 0};
 
 	char	*map[] = {
-				"11110",
+				"11111",
 				"10001",
 				"10001",
 				"10001",
@@ -232,7 +299,12 @@ int main(int argc, char **argv)
 	};
 
 	t_dda dda;
+	t_mlx mlx;
+	init_mlx(&mlx);
 	init_dda(&dda, argv, 2, 2.5);
-	dda_algo(&dda, map);
+
+	// mlx_loop_hook(&mlx, loop_hook, &mlx);
+	mlx_loop(mlx.mlx);
+	mlx_terminate(mlx.mlx);
 	return (0);
 }
