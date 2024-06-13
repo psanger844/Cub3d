@@ -6,7 +6,7 @@
 /*   By: psanger <psanger@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/06/05 19:24:38 by psanger           #+#    #+#             */
-/*   Updated: 2024/06/12 18:03:14 by psanger          ###   ########.fr       */
+/*   Updated: 2024/06/13 04:03:00 by psanger          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -54,8 +54,30 @@ typedef struct s_mlx
 
 	int			width;
 	int			height;
+
+	t_dda*		dda;
 }				t_mlx;
 
+
+char *ft_strdup(char *src)
+{
+	int i = 0;
+	char *res;
+
+	while(src[i])
+		i++;
+	res = (char*)malloc(sizeof(*res) * i + 1);
+	if (res == NULL)
+		return (NULL);
+	i = 0;
+	while(src[i])
+	{
+		res[i]=src[i];
+		i++;
+	}
+	res[i] = '\0';
+	return (res);
+}
 
 float	to_rad(int angle)
 {
@@ -224,8 +246,18 @@ void	init_dda(t_dda *dda, char **argv, float x_start, float y_start)
 		dda->angle = 0;
 	else
 		dda->angle = atoi(argv[1]);
+	dda->angle = 90;
 	while (dda->angle < 360)
 		dda->angle = dda->angle + 360;
+	dda->map = malloc(sizeof(char *) * 5);
+	dda->map[0] = ft_strdup("11111");
+	dda->map[1] = ft_strdup("10001");
+	dda->map[2] = ft_strdup("10001");
+	dda->map[3] = ft_strdup("10001");
+	dda->map[4] = ft_strdup("11111");
+	dda->map[5] = NULL;
+
+
 	dda->delta_x = 0;
 	dda->delta_y = 0;
 	dda->len = 0;
@@ -236,27 +268,54 @@ void	init_dda(t_dda *dda, char **argv, float x_start, float y_start)
 	get_dir(dda->angle, &dda->step_direction_x, &dda->step_direction_y);
 }
 
-
 int32_t ft_pixel(int32_t r, int32_t g, int32_t b, int32_t a)
 {
 	return (r << 24 | g << 16 | b << 8 | a);
 }
 
-void cast(t_dda *dda, t_mlx *mlx, int pixel) {
+void	reset(t_mlx *mlx)
+{
+	int	x;
+	int	y;
 
+	x = 0;
+	y = 0;
+	while (y < mlx->height)
+	{
+		while (x < mlx->width)
+		{
+			mlx_put_pixel(mlx->img, x, y, ft_pixel(0, 0, 0, 255));
+			x++;
+		}
+		x = 0;
+		y++;
+	}
+}
+
+
+
+void cast(t_dda *dda, t_mlx *mlx, int pixel)
+{
 	// getting rid of fish eye:
-	float real_len = dda->len * cos(to_rad(dda->angle));
-
+	// float real_len = dda->len * abs_float(cos(to_rad(dda->angle)));
+	float real_len = dda->len;
 	float height = (400 / real_len) / 2;
+
+	if (height > mlx->height / 2)
+		height = mlx->height / 2;
 
 	printf("%f %f %f\n", height, dda->len, dda->angle);
 	int mid = mlx->height / 2;
 	// bottom
-	for (int i = mid; i < mid + height; i++)
-		mlx_put_pixel(mlx->img, pixel, i, ft_pixel(123, 10, 255, 255));
+	for (int i = mid; i < mid + height; i++) {
+		if (i < mlx->height)
+			mlx_put_pixel(mlx->img, pixel, i, ft_pixel(123, 10, 255, 255));
+	}
 	// top
-	for (int i = mid - height; i < mid; i++)
-		mlx_put_pixel(mlx->img, pixel, i, ft_pixel(123, 10, 255, 255));
+	for (int i = mid - height; i < mid; i++) {
+		if (i > 0)
+			mlx_put_pixel(mlx->img, pixel, i, ft_pixel(123, 10, 255, 255));
+	}
 }
 
 void init_mlx(t_mlx *mlx) {
@@ -268,43 +327,60 @@ void init_mlx(t_mlx *mlx) {
 	mlx_image_to_window(mlx->mlx, mlx->img, 0, 0);
 }
 
-void	loop_hook()
+void	loop_hook(void* param)
 {
-	float angle = dda.angle;
-	dda.angle -= 60;
+	t_mlx *mlx = (t_mlx *)param;
+	t_dda *dda = mlx->dda;
+
+	reset(mlx);
+
+	float angle = dda->angle;
+	dda->angle -= 60;
 	double increment = (120.0f / 1024.0f);
 	int pixel = 0;
 
-	while (dda.angle < angle + 60)
+	while (dda->angle < angle + 60)
 	{
 		pixel++;
-		dda.angle += increment;
+		dda->angle += increment;
 		// printf("%f\n", dda.angle);
-		dda_algo(&dda, map);
-		cast(&dda, &mlx, pixel);
+		dda_algo(dda, dda->map);
+		cast(dda, mlx, pixel);
 	}
+	dda->angle = angle;
+	if (mlx_is_key_down(mlx->mlx, MLX_KEY_ESCAPE))
+		mlx_close_window(mlx->mlx);
+	if (mlx_is_key_down(mlx->mlx, MLX_KEY_LEFT))
+		dda->angle -= 1;
+	if (mlx_is_key_down(mlx->mlx, MLX_KEY_RIGHT))
+		dda->angle += 1;
+	if (mlx_is_key_down(mlx->mlx, MLX_KEY_A))
+		dda->start_x += 0.05;
+	if (mlx_is_key_down(mlx->mlx, MLX_KEY_D))
+		dda->start_x -= 0.05;
+	if (mlx_is_key_down(mlx->mlx, MLX_KEY_S))
+		dda->start_y += 0.05;
+	if (mlx_is_key_down(mlx->mlx, MLX_KEY_W))
+		dda->start_y -= 0.05;
+
 }
 
 int main(int argc, char **argv)
 {
 	float	start[3] = {2.5, 2.5, 0};
 
-	char	*map[] = {
-				"11111",
-				"10001",
-				"10001",
-				"10001",
-				"11111",
-				NULL
-	};
+	t_mlx *mlx;
+	t_dda *dda;
 
-	t_dda dda;
-	t_mlx mlx;
-	init_mlx(&mlx);
-	init_dda(&dda, argv, 2, 2.5);
+	mlx = malloc(sizeof(t_mlx));
+	dda = malloc(sizeof(t_dda));
 
-	// mlx_loop_hook(&mlx, loop_hook, &mlx);
-	mlx_loop(mlx.mlx);
-	mlx_terminate(mlx.mlx);
+	init_dda(dda, argv, 2.5, 2.5);
+	init_mlx(mlx);
+	mlx->dda = dda;
+
+	mlx_loop_hook(mlx->mlx, loop_hook, mlx);
+	mlx_loop(mlx->mlx);
+	mlx_terminate(mlx->mlx);
 	return (0);
 }
