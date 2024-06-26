@@ -6,7 +6,7 @@
 /*   By: psanger <psanger@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/06/05 19:24:38 by psanger           #+#    #+#             */
-/*   Updated: 2024/06/13 04:03:00 by psanger          ###   ########.fr       */
+/*   Updated: 2024/06/25 23:01:50 by psanger          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,6 +15,7 @@
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include "../MLX42/include/MLX42/MLX42.h"
 
 # define BLUE "\033[0;34m"
@@ -28,6 +29,9 @@ typedef struct s_dda
 {
 	char			**map;
 	float			angle;
+
+	int				height;
+	int				color;
 
 	float			start_x;
 	float			start_y;
@@ -240,6 +244,8 @@ void	dda_algo(t_dda *dda, char **map)
 }
 
 
+
+
 void	init_dda(t_dda *dda, char **argv, float x_start, float y_start)
 {
 	if (!argv[1])
@@ -249,13 +255,31 @@ void	init_dda(t_dda *dda, char **argv, float x_start, float y_start)
 	dda->angle = 90;
 	while (dda->angle < 360)
 		dda->angle = dda->angle + 360;
-	dda->map = malloc(sizeof(char *) * 5);
-	dda->map[0] = ft_strdup("11111");
-	dda->map[1] = ft_strdup("10001");
-	dda->map[2] = ft_strdup("10001");
-	dda->map[3] = ft_strdup("10001");
-	dda->map[4] = ft_strdup("11111");
-	dda->map[5] = NULL;
+	dda->height = 100;
+	dda->map = malloc(sizeof(char *) * 15);
+
+	dda->map[0] = ft_strdup ("1111111111111111111111111");
+	dda->map[1] = ft_strdup ("1000000000110000000000001");
+	dda->map[2] = ft_strdup ("1011000001110000000000001");
+	dda->map[3] = ft_strdup ("1001000000000000000000001");
+	dda->map[4] = ft_strdup ("111111111011000001110000000000001");
+	dda->map[5] = ft_strdup ("100000000011000001110111111111111");
+	dda->map[6] = ft_strdup ("11110111111111011100000010001");
+	dda->map[7] = ft_strdup ("11110111111111011101010010001");
+	dda->map[8] = ft_strdup ("11000000110101011100000010001");
+	dda->map[9] = ft_strdup ("10000000000000001100000010001");
+	dda->map[10] = ft_strdup ("10000000000000001101010010001");
+	dda->map[11] = ft_strdup ("11000001110101011111011110N0111");
+	dda->map[12] = ft_strdup ("11110111111101011101111010001");
+	dda->map[13] = ft_strdup ("11111111111111111111111111111");
+	dda->map[14] = NULL;
+
+	// dda->map[0] = ft_strdup("11111");
+	// dda->map[1] = ft_strdup("10001");
+	// dda->map[2] = ft_strdup("10001");
+	// dda->map[3] = ft_strdup("10001");
+	// dda->map[4] = ft_strdup("11111");
+	// dda->map[5] = NULL;
 
 
 	dda->delta_x = 0;
@@ -297,8 +321,8 @@ void	reset(t_mlx *mlx)
 void cast(t_dda *dda, t_mlx *mlx, int pixel)
 {
 	// getting rid of fish eye:
-	// float real_len = dda->len * abs_float(cos(to_rad(dda->angle)));
-	float real_len = dda->len;
+	float real_len = dda->len * abs_float(cos(to_rad(dda->angle)));
+	// float real_len = dda->len;
 	float height = (400 / real_len) / 2;
 
 	if (height > mlx->height / 2)
@@ -351,9 +375,9 @@ void	loop_hook(void* param)
 	if (mlx_is_key_down(mlx->mlx, MLX_KEY_ESCAPE))
 		mlx_close_window(mlx->mlx);
 	if (mlx_is_key_down(mlx->mlx, MLX_KEY_LEFT))
-		dda->angle -= 1;
+		dda->angle -= 2;
 	if (mlx_is_key_down(mlx->mlx, MLX_KEY_RIGHT))
-		dda->angle += 1;
+		dda->angle += 2;
 	if (mlx_is_key_down(mlx->mlx, MLX_KEY_A))
 		dda->start_x += 0.05;
 	if (mlx_is_key_down(mlx->mlx, MLX_KEY_D))
@@ -362,7 +386,114 @@ void	loop_hook(void* param)
 		dda->start_y += 0.05;
 	if (mlx_is_key_down(mlx->mlx, MLX_KEY_W))
 		dda->start_y -= 0.05;
+	if (mlx_is_key_down(mlx->mlx, MLX_KEY_UP)) {
+		dda->start_x += cos(to_rad(dda->angle)) * 0.075;
+		dda->start_y -= sin(to_rad(dda->angle)) * 0.075;
+	}
 
+}
+
+#include <stdbool.h>
+
+float	to_deg(float angle)
+{
+	return (angle / PI * 180);
+}
+
+typedef struct s_pos
+{
+	float 		x;
+	float 		y;
+} 				t_pos;
+
+bool isPointInTriangle(t_pos p, t_pos a, t_pos b, t_pos c)
+{
+	float denominator = ((b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y));
+	float alpha = ((b.y - c.y) * (p.x - c.x) + (c.x - b.x) * (p.y - c.y)) / denominator;
+	float beta = ((c.y - a.y) * (p.x - c.x) + (a.x - c.x) * (p.y - c.y)) / denominator;
+	float gamma = 1.0 - alpha - beta;
+
+	return (alpha > 0) && (beta > 0) && (gamma > 0);
+}
+
+void	get_pos_angle(float *x, float *y, int start_x, int start_y, float angle)
+{
+	float new_x = *x;
+	float new_y = *y;
+	float delta_x = new_x - (float)start_x;
+	float delta_y = new_y - (float)start_y;
+	float len = pow(pow(delta_x, 2) + pow(delta_y, 2), 0.5);
+	float angle_norm = atan2(delta_x, delta_y);
+	new_x = cos(angle + angle_norm) * len + (float)start_x;
+	new_y = sin(angle + angle_norm) * len + (float)start_y;
+	*x = (int)new_x;
+	*y = (int)new_y;
+}
+
+void	p_draw_player(t_mlx *mlx, float alpha, int height, int color)
+{
+	int width = height / 2;
+	int size = height;
+	float angle = to_rad(alpha);
+
+	if (height < width)
+		size = width;
+	size += 2;
+	t_pos top;
+	t_pos left;
+	t_pos right;
+	t_pos p;
+
+	int	start_x = mlx->width / 2;
+	int	start_y = mlx->height / 2;
+
+	top.x = start_x;
+	top.y = start_y - height / 2;
+	get_pos_angle(&top.x, &top.y, start_x, start_y, angle);
+	left.x = start_x - width / 2;
+	left.y = start_y + height / 2;
+	get_pos_angle(&left.x, &left.y, start_x, start_y, angle);
+	right.x = start_x + width / 2;
+	right.y = start_y + height / 2;
+	get_pos_angle(&right.x, &right.y, start_x, start_y, angle);
+
+	for (int i = start_y - size; i < start_y + size; i++)
+	{
+		for (int j = start_x - size; j < start_x + size; j++)
+		{
+			p.x = j;
+			p.y = i;
+			if (isPointInTriangle(p, top, left, right))
+			{
+				if (i < mlx->height && i > 0 && j < mlx->width && j > 0)
+					mlx_put_pixel(mlx->img, j, i, color);
+			}
+		}
+	}
+
+}
+
+void	loop_hook_player(void* param)
+{
+	t_mlx *mlx = (t_mlx *)param;
+	t_dda *dda = mlx->dda;
+
+	if (mlx_is_key_down(mlx->mlx, MLX_KEY_ESCAPE))
+		mlx_close_window(mlx->mlx);
+	if (mlx_is_key_down(mlx->mlx, MLX_KEY_LEFT))
+		dda->angle -= 2;
+	if (mlx_is_key_down(mlx->mlx, MLX_KEY_RIGHT))
+		dda->angle += 2;
+	if (mlx_is_key_down(mlx->mlx, MLX_KEY_1))
+		dda->height += 2;
+	if (mlx_is_key_down(mlx->mlx, MLX_KEY_2))
+		dda->height -= 2;
+	if (mlx_is_key_down(mlx->mlx, MLX_KEY_UP) && dda->color < 0xFFFFFFFF - 512)
+		dda->color += 512;
+	if (mlx_is_key_down(mlx->mlx, MLX_KEY_DOWN)&& dda->color < 512)
+		dda->color -= 512;
+	reset(mlx);
+	p_draw_player(mlx, dda->angle, dda->height, dda->color);
 }
 
 int main(int argc, char **argv)
@@ -378,8 +509,9 @@ int main(int argc, char **argv)
 	init_dda(dda, argv, 2.5, 2.5);
 	init_mlx(mlx);
 	mlx->dda = dda;
+	dda->color = 0xFF0000FF;
 
-	mlx_loop_hook(mlx->mlx, loop_hook, mlx);
+	mlx_loop_hook(mlx->mlx, loop_hook_player, mlx);
 	mlx_loop(mlx->mlx);
 	mlx_terminate(mlx->mlx);
 	return (0);
